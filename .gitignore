@@ -6,3 +6,4 @@
 *.key
 *.pem
 *.db
+flask_session/

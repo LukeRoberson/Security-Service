@@ -14,17 +14,68 @@ Example:
 
 from flask import Flask
 import flask
+from flask_session import Session
+import os
+import requests
+from colorama import Fore, Style
+from datetime import datetime
+
+from azure import azure_auth, login_required
+
+
+# Log startup message
+print(
+    Fore.GREEN,
+    "Starting security service...",
+    Style.RESET_ALL
+)
+
+requests.post(
+    "http://web-interface:5100/api/webhook",
+    json={
+        "source": "security service",
+        "type": "service.startup",
+        "timestamp": str(datetime.now()),
+        "message": "The security service is starting",
+    },
+)
+
+# Get global config
+global_config = None
+try:
+    response = requests.get("http://web-interface:5100/api/config")
+    response.raise_for_status()  # Raise an error for bad responses
+    global_config = response.json()
+
+except Exception as e:
+    print(
+        Fore.RED,
+        "Failed to fetch global config from web interface.",
+        e,
+        Style.RESET_ALL
+    )
+
+if global_config is None:
+    raise RuntimeError("Could not load global config from web interface")
 
 
 # Create the Flask application
 app = Flask(__name__)
+app.config['SECRET_KEY'] = os.getenv('api_master_pw')
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['GLOBAL_CONFIG'] = global_config['config']
+Session(app)
+
+# Register authentication blueprint
+app.register_blueprint(azure_auth)
 
 
-@app.route('/callback')
-def callback():
+@app.route('/test')
+@login_required
+def test():
     return flask.jsonify(
         {
-            'result': 'success'
+            'result': 'This is the test page'
         }
     )
 
@@ -45,6 +96,24 @@ def api_crypto():
             'result': 'success'
         }
     )
+
+
+# Log 'started' message
+print(
+    Fore.GREEN,
+    "Security service has started...",
+    Style.RESET_ALL
+)
+
+requests.post(
+    "http://web-interface:5100/api/webhook",
+    json={
+        "source": "security service",
+        "type": "service.startup",
+        "timestamp": str(datetime.now()),
+        "message": "The security service has started",
+    },
+)
 
 
 '''
