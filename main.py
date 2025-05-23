@@ -12,47 +12,93 @@ Example:
     $ python main.py
 """
 
-from flask import Flask
+from flask import Flask, session
 import flask
 from flask_session import Session
 import os
 import requests
-from colorama import Fore, Style
 from datetime import datetime
+from itsdangerous import URLSafeTimedSerializer
+import logging
 
 from azure import azure_auth, login_required
 
 
-# Log startup message
-print(
-    Fore.GREEN,
-    "Starting security service...",
-    Style.RESET_ALL
-)
+# Logging level can be set to DEBUG, INFO, WARNING, ERROR, or CRITICAL
+LOGGING_LEVEL = "INFO"
 
-requests.post(
-    "http://web-interface:5100/api/webhook",
-    json={
-        "source": "security service",
-        "type": "service.startup",
-        "timestamp": str(datetime.now()),
-        "message": "The security service is starting",
-    },
-)
+
+def send_startup_webhook(
+    message: str
+) -> None:
+    """
+    Send a startup message to the web interface.
+
+    Args:
+        message (str): The message to send.
+    """
+
+    # Terminal log
+    logging.info(message)
+
+    # Send a log as a webhook to the web interface
+    try:
+        requests.post(
+            "http://web-interface:5100/api/webhook",
+            json={
+                "source": "security service",
+                "type": "service.startup",
+                "timestamp": str(datetime.now()),
+                "message": message,
+            },
+            timeout=3
+        )
+    except Exception as e:
+        logging.warning(
+            "Failed to send startup webhook to web interface."
+            f" Error: {e}"
+        )
+
+
+def generate_auth_token(
+    user: str,
+    secret_key: str,
+) -> str:
+    """
+    Generate a secure token for the user.
+    The secret key is used to sign the token.
+        It needs to be known to services that verify the token.
+
+    Args:
+        user (str): The username or identifier of the user.
+        secret_key (str): The secret key used for signing the token.
+
+    Returns:
+        str: The generated token.
+    """
+
+    # Create a URL-safe serializer with the secret key
+    serializer = URLSafeTimedSerializer(secret_key)
+
+    # Generate a token with the user information
+    return serializer.dumps({'user': user})
+
+
+# Log startup message
+send_startup_webhook("The security service is starting")
 
 # Get global config
+logging.basicConfig(level=logging.INFO)
 global_config = None
 try:
-    response = requests.get("http://web-interface:5100/api/config")
+    response = requests.get("http://web-interface:5100/api/config", timeout=3)
     response.raise_for_status()  # Raise an error for bad responses
     global_config = response.json()
 
 except Exception as e:
-    print(
-        Fore.RED,
-        "Failed to fetch global config from web interface.",
-        e,
-        Style.RESET_ALL
+    logging.critical(
+        "Failed to fetch global config from web interface."
+        f" Error: {e}"
     )
 
 if global_config is None:
@@ -70,21 +116,42 @@ Session(app)
 app.register_blueprint(azure_auth)
 
 
-@app.route('/test')
+@app.route('/api/health')
+def health():
+    """
+    Health check endpoint.
+    Returns a JSON response indicating the service is running.
+    """
+
+    return flask.jsonify({'status': 'ok'})
+
+
+@app.route('/auth')
 @login_required
-def test():
+def auth():
+    '''
+    Authentication endpoint.
+    Users are redirected here from other services.
+    The @login_required decorator checks if the user is logged in.
+        If not, they are redirected to the login page.
+    '''
+
+    # Get user details from the session and generate a token
+    user = session.get('user')
+    secret_key = app.config['SECRET_KEY']
+    token = generate_auth_token(user, secret_key)
+
+    # Redirect to the original URL with the token
+    redirect_url = flask.request.args.get('redirect')
+    if redirect_url:
+        sep = '&' if '?' in redirect_url else '?'
+        redirect_with_token = f"{redirect_url}{sep}token={token}"
+        return flask.redirect(redirect_with_token)
+
+    # If no redirect URL is provided, return the token as JSON
     return flask.jsonify(
         {
-            'result': 'This is the test page'
-        }
-    )
-
-
-@app.route('/api/auth')
-def api_auth():
-    return flask.jsonify(
-        {
-            'result': 'success'
+            'token': token,
         }
     )
 
@@ -99,21 +166,7 @@ def api_crypto():
 
 
 # Log 'started' message
-print(
-    Fore.GREEN,
-    "Security service has started...",
-    Style.RESET_ALL
-)
-
-requests.post(
-    "http://web-interface:5100/api/webhook",
-    json={
-        "source": "security service",
-        "type": "service.startup",
-        "timestamp": str(datetime.now()),
-        "message": "The security service has started",
-    },
-)
+send_startup_webhook("The security service has started")
 
 
 '''

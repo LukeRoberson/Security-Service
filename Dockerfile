@@ -14,6 +14,9 @@ WORKDIR /app
 # Install uWSGI
 RUN apk add --no-cache uwsgi-python3
 
+# Install cURL (for health checks)
+RUN apk --no-cache add curl
+
 # Update packages
 RUN apk update
 RUN apk upgrade

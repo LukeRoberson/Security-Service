@@ -12,10 +12,14 @@ from flask import (
 from functools import wraps
 import msal
 import uuid
+import logging
 
 
 # Azure scope for permissions
 SCOPE = ['User.Read']
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
 
 
 def get_azure_config():
@@ -31,8 +35,8 @@ def get_auth_config():
     Returns the authentication configuration from the global config.
     '''
 
-    print("DEBUG: Getting auth config")
-    print("DEBUG: GLOBAL_CONFIG:", current_app.config['GLOBAL_CONFIG'])
+    logging.info("Getting auth config")
+    logging.info("GLOBAL_CONFIG: %s", current_app.config['GLOBAL_CONFIG'])
     return current_app.config['GLOBAL_CONFIG']['authentication']
 
 
@@ -79,25 +83,23 @@ def login_required(f):
     def decorated_function(*args, **kwargs):
         auth_config = get_auth_config()
         # Check if the user is logged in
-        print(f"DEBUG: ADMIN_GROUP: {auth_config['admin-group']}")
         if 'user' not in session:
-            print("DEBUG: Not logged in")
+            logging.info("User not logged in")
             # User is not logged in, redirect to login
             return redirect(url_for('azure_auth.login', next=request.url))
 
         # Get a list of groups from the session
         groups = session.get('groups', [])
-        print(f"DEBUG: User groups: {groups}")
 
         # Check if the user is in the admin group
         if auth_config['admin-group'] not in groups:
-            print("DEBUG: User NOT in admin group, denying access")
+            logging.warning("User not in admin group")
             return jsonify(
                 {'error': 'You do not have permission for this resource.'}
             ), 403
 
         # User is logged in and has permission, call the original function
-        print("DEBUG: User is in admin group, allowing access")
+        logging.info("User is logged in and has permission")
         return f(*args, **kwargs)
     return decorated_function
 
