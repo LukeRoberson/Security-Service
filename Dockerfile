@@ -3,7 +3,8 @@
 # This tag is the latest Alpine with the latest Python 3.12
 # https://pkgs.alpinelinux.org/package/edge/main/x86/uwsgi-python3
 FROM python:3.12-alpine
-LABEL maintainer="Luke Robertson <lrobertson@lakemac.nsw.gov.au>"
+LABEL description="The security service for the AI assistant. Manages authentication, authorization, and cryptography."
+LABEL version="1.0.0"
 
 # Create non-root user with no password
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
