@@ -1,4 +1,22 @@
-# azure_auth.py
+"""
+Module to manage Azure AD.
+    - Handles user authentication via Azure AD.
+
+Functions:
+    - get_azure_config: Returns the Azure configuration from the global config.
+    - get_auth_config: Returns the authentication configuration
+        from the global config.
+    - get_msal_app: Returns an MSAL app instance for authentication.
+    - login_required: Decorator to check if the user is logged in and
+        has admin permissions.
+
+Routes:
+    - login: Route to handle user login, redirecting to Azure AD.
+    - authorized: Callback route to handle Azure AD login response and
+        store user info.d
+"""
+
+
 from flask import (
     Blueprint,
     session,
@@ -20,6 +38,13 @@ SCOPE = ['User.Read']
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
+
+
+# Create a Flask blueprint for authentication
+azure_auth = Blueprint(
+    'azure_auth',
+    __name__
+)
 
 
 def get_azure_config():
@@ -55,17 +80,6 @@ def get_msal_app():
         ),
         client_credential=auth_config['app-secret'],
     )
-
-# Create the MSAL app instance
-# msal_app = msal.ConfidentialClientApplication(
-#     auth_config['app-id'],
-#     authority=f'https://login.microsoftonline.com/{azure_config["tenant-id"]}',
-#     client_credential=auth_config['app-secret'],
-# )
-
-
-# Create a Flask blueprint for authentication
-azure_auth = Blueprint('azure_auth', __name__)
 
 
 def login_required(f):

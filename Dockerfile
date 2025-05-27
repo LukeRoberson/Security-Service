@@ -22,9 +22,6 @@ RUN apk --no-cache add curl
 RUN apk update
 RUN apk upgrade
 
-# Copy the rest of the application code
-COPY . .
-
 # Change ownership of the application code to the non-root user
 RUN chown -R appuser:appgroup /app
 
@@ -35,6 +32,9 @@ USER appuser
 COPY requirements.txt requirements.txt
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
+
+# Copy the rest of the application code
+COPY . .
 
 # Start the application using uWSGI
 CMD ["uwsgi", "--ini", "uwsgi.ini"]

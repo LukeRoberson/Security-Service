@@ -41,21 +41,24 @@ def send_startup_webhook(
     # Terminal log
     logging.info(message)
 
-    # Send a log as a webhook to the web interface
+    # Send a log as a webhook to the logging service
     try:
         requests.post(
-            "http://web-interface:5100/api/webhook",
+            "http://logging:5100/api/log",
             json={
                 "source": "security service",
-                "type": "service.startup",
-                "timestamp": str(datetime.now()),
-                "message": message,
+                "destination": ["web"],
+                "log": {
+                    "type": "service.startup",
+                    "timestamp": str(datetime.now()),
+                    "message": message
+                }
             },
             timeout=3
         )
     except Exception as e:
         logging.warning(
-            "Failed to send startup webhook to web interface."
+            "Failed to send startup webhook to logging service."
             f" Error: {e}"
         )
 
