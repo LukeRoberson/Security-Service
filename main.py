@@ -12,14 +12,15 @@ Example:
     $ python main.py
 """
 
-from flask import Flask, session
-import flask
+from flask import Flask, session, request, redirect, jsonify
 from flask_session import Session
 import os
 import requests
 from datetime import datetime
 from itsdangerous import URLSafeTimedSerializer
 import logging
+import hmac
+import hashlib
 
 from azure import azure_auth, login_required
 
@@ -126,7 +127,7 @@ def health():
     Returns a JSON response indicating the service is running.
     """
 
-    return flask.jsonify({'status': 'ok'})
+    return jsonify({'status': 'ok'})
 
 
 @app.route('/auth')
@@ -145,23 +146,64 @@ def auth():
     token = generate_auth_token(user, secret_key)
 
     # Redirect to the original URL with the token
-    redirect_url = flask.request.args.get('redirect')
+    redirect_url = request.args.get('redirect')
     if redirect_url:
         sep = '&' if '?' in redirect_url else '?'
         redirect_with_token = f"{redirect_url}{sep}token={token}"
-        return flask.redirect(redirect_with_token)
+        return redirect(redirect_with_token)
 
     # If no redirect URL is provided, return the token as JSON
-    return flask.jsonify(
+    return jsonify(
         {
             'token': token,
         }
     )
 
 
-@app.route('/api/crypto')
-def api_crypto():
-    return flask.jsonify(
+@app.route(
+    '/api/hash',
+    methods=['POST']
+)
+def api_hash():
+    """
+    Endpoint to generate a hash for a given message.
+
+    Expects a JSON payload with:
+        'message' - The message to hash.
+        'secret' - The secret key used for hashing.
+        'signature' - The expected hash signature to compare against.
+
+    Returns a JSON response indicating success or failure.
+    """
+
+    # Get the fields from the request
+    data = request.get_json()
+    signature = data.get('signature')
+    message = data.get('message')
+    secret = data.get('secret')
+
+    # Check the required fields are present
+    if not message or not secret or not signature:
+        logging.error("Missing message, secret, or signature in the request.")
+        return jsonify({'error': 'Missing message, secret, or signature'}), 400
+
+    # Generate our own hash
+    hash = hmac.new(
+        secret.encode(),
+        message.encode(),
+        hashlib.sha256
+    ).hexdigest()
+
+    # Return a simple success or failure response
+    if not hmac.compare_digest(hash, signature):
+        return jsonify(
+            {
+                'result': 'error',
+                'error': 'Invalid signature'
+            }
+        ), 403
+
+    return jsonify(
         {
             'result': 'success'
         }

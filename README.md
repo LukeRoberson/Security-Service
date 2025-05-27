@@ -39,3 +39,34 @@ There are two main parts to this:
     * The token is added to the current session (tracks that the user is logged in)
 6. If auth is successful, the user is redirected to their original URL
 
+
+</br></br>
+----
+
+# Signature Validation
+
+A webhook is often sent with a signature (although this depends on the sender) to ''sign'' the contents of the webhook.
+
+We can use this to validate that this webhook was sent from a valid source. This relies on the sender being configured to use a **secret**.
+
+
+## HMAC_SHA256
+
+One common way is for the sender to generate the signature and attach it as a header.
+
+The sender will:
+1. Concatenate the secret with the message body (in that order) to create a string
+2. Generate a hash using HMAC_SHA256 on that string
+3. Attach that string as a header to the original message
+4. Send the webhook as normal
+
+Mist, for example, will attach the **X-Mist-Signature-v2** header to include the secret.
+
+Note, some webhook senders may use different security algorithms. Mist for example, also supports using the **HMAC_SHA1** algorithm, sent in the **X-Mist-Signature** header.
+
+When the webhook is received, the receiver can perform the same steps to verify the sender:
+1. Extract the signature header
+2. Concatenate the known secret to the body to get a string
+3. Generate a hash
+4. Compare the hash to the contents of the signature in the header
+
