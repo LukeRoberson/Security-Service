@@ -58,8 +58,8 @@ def send_startup_webhook(
         )
     except Exception as e:
         logging.warning(
-            "Failed to send startup webhook to logging service."
-            f" Error: {e}"
+            "Failed to send startup webhook to logging service. %s",
+            e
         )
 
 
