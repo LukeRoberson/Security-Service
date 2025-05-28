@@ -25,7 +25,7 @@ import hmac
 import hashlib
 
 from azure import azure_auth, login_required
-from systemlog import SystemLog
+from systemlog import system_log
 
 
 # Get global config
@@ -49,16 +49,6 @@ log_level_str = global_config['config']['web']['logging-level'].upper()
 log_level = getattr(logging, log_level_str, logging.INFO)
 logging.basicConfig(level=log_level)
 logging.info("Logging level set to: %s", log_level_str)
-
-system_log = SystemLog(
-    logging_url="http://logging:5100/api/log",
-    source="security service",
-    destination=["web"],
-    group="service",
-    category="security",
-    alert="system",
-    severity="info"
-)
 
 # Create the Flask application
 app = Flask(__name__)

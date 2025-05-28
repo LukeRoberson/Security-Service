@@ -140,3 +140,15 @@ class SystemLog:
             return False
 
         return True
+
+
+# Initialize the SystemLog with default values
+system_log = SystemLog(
+    logging_url="http://logging:5100/api/log",
+    source="security",
+    destination=["web"],
+    group="service",
+    category="security",
+    alert="system",
+    severity="info"
+)
