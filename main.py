@@ -28,8 +28,34 @@ import hashlib
 from azure import azure_auth, login_required
 
 
-# Logging level can be set to DEBUG, INFO, WARNING, ERROR, or CRITICAL
-LOGGING_LEVEL = "INFO"
+# Get global config
+global_config = None
+try:
+    response = requests.get("http://web-interface:5100/api/config", timeout=3)
+    response.raise_for_status()  # Raise an error for bad responses
+    global_config = response.json()
+
+except Exception as e:
+    logging.critical(
+        "Failed to fetch global config from web interface."
+        f" Error: {e}"
+    )
+
+if global_config is None:
+    raise RuntimeError("Could not load global config from web interface")
+
+# Set up logging
+log_level_str = global_config['config']['web']['logging-level'].upper()
+log_level = getattr(logging, log_level_str, logging.INFO)
+logging.basicConfig(level=log_level)
+logging.info("Logging level set to: %s", log_level_str)
+
+# Create the Flask application
+app = Flask(__name__)
+app.config['SECRET_KEY'] = os.getenv('api_master_pw')
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['GLOBAL_CONFIG'] = global_config['config']
+Session(app)
 
 
 def send_log(
@@ -110,31 +136,6 @@ def generate_auth_token(
 
 # Log startup message
 send_log("The security service is starting")
-
-# Get global config
-logging.basicConfig(level=logging.INFO)
-global_config = None
-try:
-    response = requests.get("http://web-interface:5100/api/config", timeout=3)
-    response.raise_for_status()  # Raise an error for bad responses
-    global_config = response.json()
-
-except Exception as e:
-    logging.critical(
-        "Failed to fetch global config from web interface."
-        f" Error: {e}"
-    )
-
-if global_config is None:
-    raise RuntimeError("Could not load global config from web interface")
-
-
-# Create the Flask application
-app = Flask(__name__)
-app.config['SECRET_KEY'] = os.getenv('api_master_pw')
-app.config['SESSION_TYPE'] = 'filesystem'
-app.config['GLOBAL_CONFIG'] = global_config['config']
-Session(app)
 
 # Register authentication blueprint
 app.register_blueprint(azure_auth)

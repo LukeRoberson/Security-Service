@@ -36,10 +36,6 @@ import logging
 # Azure scope for permissions
 SCOPE = ['User.Read']
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-
-
 # Create a Flask blueprint for authentication
 azure_auth = Blueprint(
     'azure_auth',
@@ -60,8 +56,8 @@ def get_auth_config():
     Returns the authentication configuration from the global config.
     '''
 
-    logging.info("Getting auth config")
-    logging.info("GLOBAL_CONFIG: %s", current_app.config['GLOBAL_CONFIG'])
+    logging.debug("Getting auth config")
+    logging.debug("GLOBAL_CONFIG: %s", current_app.config['GLOBAL_CONFIG'])
     return current_app.config['GLOBAL_CONFIG']['authentication']
 
 
@@ -143,6 +139,8 @@ def login():
         state=session['state'],
         redirect_uri=url_for('azure_auth.authorized', _external=True)
     )
+    logging.info("Redirecting to Azure AD login page")
+    logging.debug("Auth URL: %s", auth_url)
 
     # Redirect to the Azure AD login page
     return redirect(auth_url)
@@ -178,26 +176,41 @@ def authorized():
             scopes=SCOPE,
             redirect_uri=url_for('azure_auth.authorized', _external=True)
         )
+        logging.debug(
+            "Result from MSAL acquire_token_by_authorization_code: %s",
+            result
+        )
 
         # Check if the token was successfully retrieved
         if 'access_token' in result:
             # Store the user info in the session
             session['user'] = result.get('id_token_claims')
+            logging.debug("User info stored in session: %s", session['user'])
 
             # Store the groups in the session
             session['groups'] = result.get('id_token_claims').get('groups', [])
+            logging.debug(
+                "User groups stored in session: %s",
+                session['groups']
+            )
 
             # Redirect to the original URL or home page
             next_url = session.pop('next_url', None)
             if next_url:
+                logging.info("Redirecting to original URL: %s", next_url)
                 return redirect(next_url)
             return redirect('/')
 
         # If the token was not retrieved, return an error
+        logging.error(
+            "Failed to acquire token by authorization code: %s",
+            result
+        )
         return (
             f"Error: {result.get('error')} - "
             f"{result.get('error_description')}"
         )
 
     # If no code was provided, return an error
+    logging.error("No code provided in the request")
     return "No code provided"
