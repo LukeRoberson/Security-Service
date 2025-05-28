@@ -5,11 +5,14 @@ Used for:
     - Authenticating users with an iDP
     - Encrypting and decrypting data
 
-Usage:
-    Run this module to start the security service.
+Functions:
+    - send_log: Send a log message to the logging service
+    - generate_auth_token: Generate a secure token for a user
 
-Example:
-    $ python main.py
+Endpoints:
+    - /auth: Authenticate users and generate tokens
+    - /api/hash: Generate a hash for a given message and verify its signature
+    - /api/health: Health check endpoint to ensure the service is running
 """
 
 from flask import Flask, session, request, redirect, jsonify
@@ -29,14 +32,28 @@ from azure import azure_auth, login_required
 LOGGING_LEVEL = "INFO"
 
 
-def send_startup_webhook(
-    message: str
+def send_log(
+    message: str,
+    url: str = "http://logging:5100/api/log",
+    source: str = "security service",
+    destination: list = ["web"],
+    group: str = "service",
+    category: str = "security",
+    alert: str = "startup",
+    severity: str = "info",
 ) -> None:
     """
-    Send a startup message to the web interface.
+    Send a message to the logging service.
 
     Args:
         message (str): The message to send.
+        url (str): The URL of the logging service API.
+        source (str): The source of the log message.
+        destination (list): The destinations for the log message.
+        group (str): The group to which the log message belongs.
+        category (str): The category of the log message.
+        alert (str): The alert type for the log message.
+        severity (str): The severity level of the log message.
     """
 
     # Terminal log
@@ -45,12 +62,15 @@ def send_startup_webhook(
     # Send a log as a webhook to the logging service
     try:
         requests.post(
-            "http://logging:5100/api/log",
+            url,
             json={
-                "source": "security service",
-                "destination": ["web"],
+                "source": source,
+                "destination": destination,
                 "log": {
-                    "type": "service.startup",
+                    "group": group,
+                    "category": category,
+                    "alert": alert,
+                    "severity": severity,
                     "timestamp": str(datetime.now()),
                     "message": message
                 }
@@ -89,7 +109,7 @@ def generate_auth_token(
 
 
 # Log startup message
-send_startup_webhook("The security service is starting")
+send_log("The security service is starting")
 
 # Get global config
 logging.basicConfig(level=logging.INFO)
@@ -211,7 +231,7 @@ def api_hash():
 
 
 # Log 'started' message
-send_startup_webhook("The security service has started")
+send_log("The security service has started")
 
 
 '''
