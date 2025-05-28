@@ -19,13 +19,13 @@ from flask import Flask, session, request, redirect, jsonify
 from flask_session import Session
 import os
 import requests
-from datetime import datetime
 from itsdangerous import URLSafeTimedSerializer
 import logging
 import hmac
 import hashlib
 
 from azure import azure_auth, login_required
+from systemlog import SystemLog
 
 
 # Get global config
@@ -50,64 +50,22 @@ log_level = getattr(logging, log_level_str, logging.INFO)
 logging.basicConfig(level=log_level)
 logging.info("Logging level set to: %s", log_level_str)
 
+system_log = SystemLog(
+    logging_url="http://logging:5100/api/log",
+    source="security service",
+    destination=["web"],
+    group="service",
+    category="security",
+    alert="system",
+    severity="info"
+)
+
 # Create the Flask application
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('api_master_pw')
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['GLOBAL_CONFIG'] = global_config['config']
 Session(app)
-
-
-def send_log(
-    message: str,
-    url: str = "http://logging:5100/api/log",
-    source: str = "security service",
-    destination: list = ["web"],
-    group: str = "service",
-    category: str = "security",
-    alert: str = "startup",
-    severity: str = "info",
-) -> None:
-    """
-    Send a message to the logging service.
-
-    Args:
-        message (str): The message to send.
-        url (str): The URL of the logging service API.
-        source (str): The source of the log message.
-        destination (list): The destinations for the log message.
-        group (str): The group to which the log message belongs.
-        category (str): The category of the log message.
-        alert (str): The alert type for the log message.
-        severity (str): The severity level of the log message.
-    """
-
-    # Terminal log
-    logging.info(message)
-
-    # Send a log as a webhook to the logging service
-    try:
-        requests.post(
-            url,
-            json={
-                "source": source,
-                "destination": destination,
-                "log": {
-                    "group": group,
-                    "category": category,
-                    "alert": alert,
-                    "severity": severity,
-                    "timestamp": str(datetime.now()),
-                    "message": message
-                }
-            },
-            timeout=3
-        )
-    except Exception as e:
-        logging.warning(
-            "Failed to send startup webhook to logging service. %s",
-            e
-        )
 
 
 def generate_auth_token(
@@ -135,7 +93,7 @@ def generate_auth_token(
 
 
 # Log startup message
-send_log("The security service is starting")
+system_log.log("The security service is starting")
 
 # Register authentication blueprint
 app.register_blueprint(azure_auth)
@@ -232,7 +190,7 @@ def api_hash():
 
 
 # Log 'started' message
-send_log("The security service has started")
+system_log.log("The security service has started")
 
 
 '''
