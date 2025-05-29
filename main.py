@@ -26,6 +26,7 @@ import hashlib
 
 from azure import azure_auth, login_required
 from systemlog import system_log
+from crypto import CryptoSecret
 
 
 # Get global config
@@ -177,6 +178,103 @@ def api_hash():
             'result': 'success'
         }
     )
+
+
+@app.route(
+    '/api/crypto',
+    methods=['POST']
+)
+def api_crypto():
+    """
+    Endpoint to encrypt or decrypt data.
+
+    Expects a 'type' field in the body to indicate the operation
+        'encrypt' or 'decrypt'
+
+    For 'encrypt', expects 'plain-text' in the request body.
+        This is the string to encrypt.
+
+    For 'decrypt', expects 'encrypted' and 'salt' in the request body.
+        This is the encrypted string and the salt used for encryption.
+
+    Returns a JSON response indicating success or failure.
+        Includes extra information based on the operation type.
+        'encrypted' - The encrypted string
+        'salt' - The salt used for encryption
+        'decrypted' - The decrypted string
+    """
+
+    data = request.get_json()
+
+    # Work out if we're encrypting or decrypting
+    crypto_type = data.get('type')
+    if crypto_type not in ['encrypt', 'decrypt']:
+        logging.error("Invalid crypto type: %s", crypto_type)
+        return jsonify(
+            {
+                'result': 'error',
+                'error': 'Invalid crypto type'
+            }
+        ), 400
+
+    if crypto_type == 'encrypt':
+        # Get the string to encrypt
+        plain_text = data.get('plain-text')
+        if not plain_text:
+            logging.error("Missing 'plain-text' in the request.")
+            return jsonify(
+                {
+                    'result': 'error',
+                    'error': "Missing 'plain-text' in the request"
+                }
+            ), 400
+
+        # Encrypt the string using the Crypto class
+        with CryptoSecret() as crypto:
+            encrypted, salt = crypto.encrypt(plain_text)
+
+        # Return the encrypted string and salt
+        return jsonify(
+            {
+                'result': 'success',
+                'encrypted': str(encrypted),
+                'salt': str(salt)
+            }
+        )
+
+    elif crypto_type == 'decrypt':
+        # Get the encrypted string and salt
+        encrypted = data.get('encrypted')
+        salt = data.get('salt')
+        if not encrypted or not salt:
+            logging.error("Missing 'encrypted' or 'salt' in the request.")
+            return jsonify(
+                {
+                    'result': 'error',
+                    'error': "Missing 'encrypted' or 'salt' in the request"
+                }
+            ), 400
+
+        # Decrypt the string using the Crypto class
+        with CryptoSecret() as crypto:
+            decrypted = crypto.decrypt(encrypted, salt)
+
+        if not decrypted:
+            logging.error("Decryption failed.")
+            return jsonify(
+                {
+                    'result': 'error',
+                    'error': 'Decryption failed'
+                }
+            ), 500
+
+        # Return the decrypted string
+        return jsonify(
+            {
+                'result': 'success',
+                'decrypted': decrypted
+            }
+        )
 
 
 # Log 'started' message
