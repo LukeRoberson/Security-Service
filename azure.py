@@ -89,6 +89,9 @@ def login_required(f):
     2. Checks if the user is in the admin group.
         - If not, returns a 403 error.
     3. If both checks pass, calls the original function.
+
+    Include 'prompt=login' parameter in the URL to force the user
+        to log in, even if they are already logged in to Azure AD.
     """
 
     @wraps(f)
@@ -98,7 +101,13 @@ def login_required(f):
         if 'user' not in session:
             logging.info("User not logged in")
             # User is not logged in, redirect to login
-            return redirect(url_for('azure_auth.login', next=request.url))
+            return redirect(
+                url_for(
+                    'azure_auth.login',
+                    next=request.url,
+                    # prompt='login',
+                )
+            )
 
         # Get a list of groups from the session
         groups = session.get('groups', [])
@@ -116,13 +125,31 @@ def login_required(f):
     return decorated_function
 
 
-@azure_auth.route('/login')
+@azure_auth.route(
+    '/login',
+    methods=['GET']
+)
 def login():
     '''
     Login Route - Redirected here if the user is not logged in.
     1. Tracks the URL the user was trying to access
     2. Generates a unique state for the session
     3. Redirects to the Azure AD login page
+
+    get_authorization_request_url() is used to generate the URL for login.
+        This URL contains the necessary parameters for Azure AD to
+        authenticate the user and redirect back to the application.
+    When SSO is configured, the username is passed automatically
+        The user doesn't have to do anything. They briefly see the
+        Azure AD login page, and then they are redirected back to the app.
+    When the 'prompt' parameter is set to 'login', the user is forced to
+        provide credentials, even if they are already logged in to Azure AD.
+        This is useful to authenticating service accounts
+    The 'login_hint' parameter is used to pre-fill the username with a
+        suggested username. The user can change it if they want.
+
+    Include the 'prompt=login' parameter in the URL to force
+        the user to log in, even if they are already logged in to Azure AD.
     '''
 
     msal_app = get_msal_app()
@@ -135,11 +162,23 @@ def login():
     # Generate a unique state for the session
     session['state'] = str(uuid.uuid4())
 
+    # Check if 'prompt' mode is specified in the request
+    prompt_mode = request.args.get('prompt', None)
+    if prompt_mode:
+        # Enables the 'prompt' parameter in the authorization request
+        prompt_value = prompt_mode
+        login_hint = "serviceaccount@domain.com"
+    else:
+        prompt_value = None
+        login_hint = None
+
     # Create the authorization URL
     auth_url = msal_app.get_authorization_request_url(
         SCOPE,
         state=session['state'],
-        redirect_uri=url_for('azure_auth.authorized', _external=True)
+        redirect_uri=url_for('azure_auth.authorized', _external=True),
+        prompt=prompt_value,
+        login_hint=login_hint
     )
     logging.info("Redirecting to Azure AD login page")
     logging.debug("Auth URL: %s", auth_url)
@@ -152,12 +191,14 @@ def login():
 def authorized():
     '''
     Callback Route - Redirected here after Azure AD login.
-    Azure will post the authorization code to this URL.
+        Azure will post the authorization code to this URL.
+
+    TokenManager is the class used to store and manage tokens.
 
     1. Checks for errors in the request
     2. If no errors, retrieves the authorization code
     3. Exchanges the code for an access token
-    4. If successful, stores the user info in the session
+    4. If successful, stores the user info in the session and TokenManager
     5. Redirects to the original URL or home page
     '''
 
@@ -204,10 +245,6 @@ def authorized():
                 )
                 logging.debug(
                     "Token stored for user: %s", user_id
-                )
-            with TokenManager() as tm:
-                logging.info(
-                    "Token database: %s", tm.get_token()
                 )
 
             # Store the user info in the session
