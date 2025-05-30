@@ -177,7 +177,7 @@ class CryptoSecret:
 
         # Encode salt as base64 string for safe transport
         salt_b64 = base64.b64encode(salt).decode('utf-8')
-        encrypted_str = encrypted_message.decode('utf-8')  # Also decode encrypted_message for JSON
+        encrypted_str = encrypted_message.decode('utf-8')
 
         return encrypted_str, salt_b64
 
