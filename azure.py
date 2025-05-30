@@ -32,6 +32,8 @@ import msal
 import uuid
 import logging
 
+from tokenmgmt import TokenManager
+
 
 # Azure scope for permissions
 SCOPE = ['User.Read']
@@ -183,6 +185,31 @@ def authorized():
 
         # Check if the token was successfully retrieved
         if 'access_token' in result:
+            # Store useful fields
+            access_token = result['access_token']
+            refresh_token = result.get('refresh_token', None)
+            expiry = result['id_token_claims']['exp']
+            user_id = result['id_token_claims']['preferred_username']
+            logging.debug(
+                "Access token acquired for user: %s", user_id
+            )
+
+            # Store the token in the TokenManager
+            with TokenManager() as token_manager:
+                token_manager.add_token(
+                    user_id=user_id,
+                    bearer_token=access_token,
+                    refresh_token=refresh_token,
+                    expiration=expiry,
+                )
+                logging.debug(
+                    "Token stored for user: %s", user_id
+                )
+            with TokenManager() as tm:
+                logging.info(
+                    "Token database: %s", tm.get_token()
+                )
+
             # Store the user info in the session
             session['user'] = result.get('id_token_claims')
             logging.debug("User info stored in session: %s", session['user'])
