@@ -17,6 +17,9 @@ Routes:
         Generate a hash for a given message and verify its signature.
     - /api/crypto:
         Encrypt or decrypt data based on the request type.
+    - /api/token:
+        Return a bearer token for the Teams user.
+        This can also be used to check if the user is authenticated.
 """
 
 
@@ -33,9 +36,11 @@ import logging
 import hmac
 import hashlib
 from itsdangerous import URLSafeTimedSerializer
+from time import time
 
 from crypto import CryptoSecret
 from azure import login_required
+from tokenmgmt import TokenManager
 
 
 def generate_auth_token(
@@ -260,3 +265,56 @@ def api_crypto():
                 'decrypted': decrypted
             }
         )
+
+
+@security_api.route(
+    '/api/token',
+    methods=['GET']
+)
+def bearer_token():
+    """
+    Endpoint to return a bearer token for the Teams user.
+    This is used for authentication with MS Graph API.
+
+    Returns a JSON response with the token, if available.
+    If the token is not available, it returns an error.
+        - result: 'success' or 'error'
+        - token: The bearer token if available
+        - validity: The validity time of the token (epoch time)
+        - error: Error message if the token is not available
+
+    This endpoint is used to check if the user is authenticated
+        200 - Token found
+        404 - Token not found
+    """
+
+    with TokenManager() as token_manager:
+        # Check if the token is available
+        service_account = current_app.config['GLOBAL_CONFIG']['teams']['user']
+        token = token_manager.get_token(user_id=service_account)
+
+    # Token found
+    if token:
+        logging.info(
+            "Returning token for service account: %s",
+            service_account
+        )
+        return jsonify(
+            {
+                'result': 'success',
+                'token': token['bearer'],
+                'validity': int(time()) + 60
+            }
+        ), 200
+
+    # Token not found
+    else:
+        logging.warning(
+            "No token available for service account: %s", service_account
+        )
+        return jsonify(
+            {
+                'result': 'error',
+                'error': 'No token available for the service account'
+            }
+        ), 404

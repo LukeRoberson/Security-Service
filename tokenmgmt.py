@@ -32,6 +32,8 @@ class TokenManager:
         - __repr__: Unambiguous string representation of this instance.
         - __str__: User-friendly representation of this instance.
         - __iter__: Iterate over tokens stored in the database.
+        - __enter__: Open the database connection and return self.
+        - __exit__: Close the database connection, committing or rolling back
         - _create_db: Create the SQLite database for token management.
         - _clean_db: Check database for expired tokens, and remove them.
         - add_token: Add a new token to the database.
@@ -253,7 +255,8 @@ class TokenManager:
                 If not provided, all tokens are returned.
 
         Returns:
-            dict | None: A dictionary containing the token information,
+            dict | None:
+                A dictionary containing the token information,
                 or None if no token is found.
         """
 
