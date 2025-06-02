@@ -116,7 +116,18 @@ def login_required(f):
         if auth_config['admin-group'] not in groups:
             logging.warning("User not in admin group")
             return jsonify(
-                {'error': 'You do not have permission for this resource.'}
+                {
+                    'result': 'error',
+                    'error': 'You do not have permission for this resource.',
+                    'user': session.get(
+                        'user',
+                        {}
+                    ).get(
+                        'preferred_username',
+                        'unknown'
+                    ),
+                    'groups': groups,
+                }
             ), 403
 
         # User is logged in and has permission, call the original function
