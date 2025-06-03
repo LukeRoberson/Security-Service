@@ -296,12 +296,14 @@ def bearer_token():
     # Token found
     if token:
         logging.info(
-            "Returning token for service account: %s",
+            "/api/token: Returning token for service account: %s",
             service_account
         )
+
         return jsonify(
             {
                 'result': 'success',
+                'user': token['user_id'],
                 'token': token['bearer'],
                 'validity': int(time()) + 60
             }
@@ -310,11 +312,13 @@ def bearer_token():
     # Token not found
     else:
         logging.warning(
-            "No token available for service account: %s", service_account
+            "/api/token: No token available for service account: %s",
+            service_account
         )
         return jsonify(
             {
                 'result': 'error',
-                'error': 'No token available for the service account'
+                'error': f'There is no token available for {service_account}. '
+                f'They are likely not authenticated yet.',
             }
         ), 404

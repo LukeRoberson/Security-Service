@@ -35,8 +35,11 @@ import logging
 from tokenmgmt import TokenManager
 
 
-# Azure scope for permissions
-SCOPE = ['User.Read']
+# Azure scope: Permissions to access the web interface
+web_scope = ['User.Read']
+
+# Teams scope: Permissions to access Microsoft Teams chats
+teams_scope = ['Chat.ReadWrite']
 
 # Create a Flask blueprint for authentication
 azure_auth = Blueprint(
@@ -165,6 +168,10 @@ def login():
 
     msal_app = get_msal_app()
 
+    # Use web scope by default
+    #   This assumes the user is accessing the web interface
+    scope = web_scope
+
     # Track the URL the user was trying to access
     next_url = request.args.get('next')
     if next_url:
@@ -178,14 +185,19 @@ def login():
     if prompt_mode:
         # Enables the 'prompt' parameter in the authorization request
         prompt_value = prompt_mode
-        login_hint = "serviceaccount@domain.com"
+        login_hint = current_app.config['GLOBAL_CONFIG']['teams']['user']
+
+        # Update the scope to the teams scope
+        #   If the prompt is 'login', we assume the user is the service account
+        scope = teams_scope
+
     else:
         prompt_value = None
         login_hint = None
 
     # Create the authorization URL
     auth_url = msal_app.get_authorization_request_url(
-        SCOPE,
+        scope,
         state=session['state'],
         redirect_uri=url_for('azure_auth.authorized', _external=True),
         prompt=prompt_value,
@@ -227,7 +239,7 @@ def authorized():
         # Get a token from the code
         result = msal_app.acquire_token_by_authorization_code(
             code,
-            scopes=SCOPE,
+            scopes=web_scope,
             redirect_uri=url_for('azure_auth.authorized', _external=True)
         )
         logging.debug(
