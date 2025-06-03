@@ -48,7 +48,7 @@ azure_auth = Blueprint(
 )
 
 
-def get_azure_config():
+def get_azure_config() -> dict:
     '''
     Returns the Azure configuration from the global config.
     '''
@@ -56,7 +56,7 @@ def get_azure_config():
     return current_app.config['GLOBAL_CONFIG']['azure']
 
 
-def get_auth_config():
+def get_auth_config() -> dict:
     '''
     Returns the authentication configuration from the global config.
     '''
@@ -66,7 +66,7 @@ def get_auth_config():
     return current_app.config['GLOBAL_CONFIG']['authentication']
 
 
-def get_msal_app():
+def get_msal_app() -> msal.ConfidentialClientApplication:
     '''
     Returns an MSAL app instance for authentication.
     This is called as needed; It does not live for the lifetime of the app.
@@ -83,11 +83,17 @@ def get_msal_app():
     )
 
 
-def graph_token_refresh():
+def graph_token_refresh() -> dict:
     '''
     Refresh the bearer token for the service account.
     This function uses the MSAL library to refresh the token using
         the provided refresh token.
+
+    returns:
+        dict: A dictionary with the result of the operation.
+            - 'result': 'success' if the token was refreshed successfully,
+                'error' if there was an error.
+            - 'error': An error message if there was an error.
     '''
 
     # Get the service account user from the config
@@ -104,6 +110,7 @@ def graph_token_refresh():
             "No token found for service account %s",
             service_account
         )
+
         return {
             'result': 'error',
             'error': f'No token found for {service_account}'
@@ -126,6 +133,7 @@ def graph_token_refresh():
             result.get('error') if result else 'No result',
             result.get('error_description') if result else 'No description'
         )
+
         return {
             'result': 'error',
             'error': "Failed to refresh token"
@@ -145,7 +153,12 @@ def graph_token_refresh():
             refresh_token=result.get('refresh_token', None),
             expiration=result['id_token_claims']['exp'],
         )
+
     logging.info("Token refreshed successfully for service account")
+    return {
+        'result': 'success',
+        'message': 'Token refreshed successfully'
+    }
 
 
 def login_required(f):

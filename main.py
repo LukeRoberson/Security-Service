@@ -58,7 +58,6 @@ system_log.log("The security service is starting")
 # Register authentication blueprint
 app.register_blueprint(azure_auth)
 
-
 # Log 'started' message
 system_log.log("The security service has started")
 

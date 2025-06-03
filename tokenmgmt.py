@@ -233,7 +233,6 @@ class TokenManager:
             )
 
             logging.info("Token added for user_id: %s", user_id)
-            return True
 
         except Exception as e:
             logging.error("Failed to add token: %s", e)
@@ -242,6 +241,9 @@ class TokenManager:
                 secerity="error",
             )
             return False
+
+        # Schedule a refresh job
+        return True
 
     def get_token(
         self,

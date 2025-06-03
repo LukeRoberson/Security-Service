@@ -39,7 +39,7 @@ from itsdangerous import URLSafeTimedSerializer
 from time import time
 
 from crypto import CryptoSecret
-from azure import login_required
+from azure import login_required, graph_token_refresh
 from tokenmgmt import TokenManager
 
 
@@ -322,3 +322,42 @@ def bearer_token():
                 f'They are likely not authenticated yet.',
             }
         ), 404
+
+
+@security_api.route(
+    '/api/refresh_token',
+    methods=['GET']
+)
+def refresh_token():
+    """
+    Endpoint to refresh the Teams user token.
+    This is used to ensure the token is valid and up-to-date.
+
+    Returns a JSON response indicating success or failure.
+        - result: 'success' or 'error'
+        - error: Success message or error details
+    """
+
+    logging.info("/api/refresh_token: Refreshing Teams user token")
+    result = graph_token_refresh()
+
+    print("debug: result", result)
+
+    if result['result'] == 'success':
+        logging.info("/api/refresh_token: Token refreshed successfully")
+        return jsonify(
+            {
+                'result': 'success'
+            }
+        )
+
+    else:
+        logging.error(
+            "/api/refresh_token: Failed to refresh token"
+        )
+        return jsonify(
+            {
+                'result': 'error',
+                'error': result.get('error', 'Unknown error occurred')
+            }
+        )
