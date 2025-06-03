@@ -7,9 +7,9 @@ Contains classes and functions for managing tokens,
 import sqlite3
 from typing import Optional
 import logging
+import time
 
 from systemlog import system_log
-import time
 
 
 class TokenManager:
@@ -258,6 +258,10 @@ class TokenManager:
             dict | None:
                 A dictionary containing the token information,
                 or None if no token is found.
+                - 'user_id': The user ID associated with the token,
+                - 'bearer': The bearer token,
+                - 'refresh': The refresh token (if available),
+                - 'expiry': The expiration time of the token (epoch).
         """
 
         # Clean the database before retrieving tokens

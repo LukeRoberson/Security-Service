@@ -83,6 +83,71 @@ def get_msal_app():
     )
 
 
+def graph_token_refresh():
+    '''
+    Refresh the bearer token for the service account.
+    This function uses the MSAL library to refresh the token using
+        the provided refresh token.
+    '''
+
+    # Get the service account user from the config
+    service_account = current_app.config["GLOBAL_CONFIG"]['teams']['user']
+
+    # Get the current refresh token
+    with TokenManager() as token_manager:
+        # Retrieve the refresh token for the service account
+        token = token_manager.get_token(user_id=service_account)
+
+    if not token or 'refresh' not in token:
+        logging.error(
+            "graph_token_refresh(): "
+            "No token found for service account %s",
+            service_account
+        )
+        return {
+            'result': 'error',
+            'error': f'No token found for {service_account}'
+        }
+
+    # Graph API
+    msal_app = get_msal_app()
+    logging.info(
+        "graph_token_refresh(): Requesting new token using refresh token"
+    )
+    result = msal_app.acquire_token_by_refresh_token(
+        token['refresh'],
+        scopes=teams_scope
+    )
+
+    # Check if the response is valid
+    if not result or 'access_token' not in result:
+        logging.error(
+            "graph_token_refresh(): Failed to refresh token: %s - %s",
+            result.get('error') if result else 'No result',
+            result.get('error_description') if result else 'No description'
+        )
+        return {
+            'result': 'error',
+            'error': "Failed to refresh token"
+        }
+
+    # If successful, save the new token
+    with TokenManager() as token_manager:
+        # Delete the old token for the service account
+        token_manager.delete_token(
+            user_id=service_account
+        )
+
+        # Add the new token for the service account
+        token_manager.add_token(
+            user_id=service_account,
+            bearer_token=result['access_token'],
+            refresh_token=result.get('refresh_token', None),
+            expiration=result['id_token_claims']['exp'],
+        )
+    logging.info("Token refreshed successfully for service account")
+
+
 def login_required(f):
     """
     Decorator to check if the user is logged in and has admin permissions.
@@ -210,7 +275,9 @@ def login():
     return redirect(auth_url)
 
 
-@azure_auth.route('/callback')
+@azure_auth.route(
+    '/callback'
+)
 def authorized():
     '''
     Callback Route - Redirected here after Azure AD login.
