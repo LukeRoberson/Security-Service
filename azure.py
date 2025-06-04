@@ -307,7 +307,7 @@ def login():
 
 @azure_auth.route(
     '/callback',
-    methods=['POST']
+    methods=['GET']
 )
 def authorized():
     '''
