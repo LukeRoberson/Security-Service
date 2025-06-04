@@ -169,7 +169,6 @@ class TokenManager:
         self.conn.commit()
 
         logging.info("Database initialized at %s", self.db_path)
-        system_log.log("Logging database initialized")
 
     def _clean_db(
         self
