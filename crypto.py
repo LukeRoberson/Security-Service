@@ -1,10 +1,26 @@
 '''
-Provides encryption and decryption for device secrets
-Uses the master password stored in an environment variable (api_master_pw)
+Module: crypto.py
+
+Provides encryption and decryption services. This is commonly used for
+    passwords and secrets that need to be stored securely.
+Plain text strings are encrypted using AES256 encryption. This yields an
+    encrypted string and a salt.
+An encrypted string can be decrypted to a plain-text string
+    (requires corresponding salt).
+
+Requires a master password to be set in the 'api_master_pw'
+    environment variable. If this changes, encrypted secrets
+    will not be decryptable.
+The master password can be set within the OS itself, or passed in through
+    Docker. It should never be hard-coded or included in a dockerfile.
 
 Classes:
     CryptoSecret
-        Provides encryption and decryption for device secrets
+        Provides encryption and decryption for strings
+        Intended to be used with a context manager ('with' statement)
+
+Dependencies:
+    cryptography: For encryption and decryption
 '''
 
 from cryptography.fernet import Fernet
@@ -21,35 +37,15 @@ from typing import Tuple
 
 class CryptoSecret:
     '''
-    Provides encryption and decryption for device secrets
+    Encryption and decryption for device secrets
 
-    Supports being instantiated with the 'with' statement
-
-    Methods:
-        __init__()
-            Class constructor
-
-        __enter__()
-            Context manager
-
-        __exit__(exc_type, exc_value, exc_traceback)
-            Context manager
-
-        decrypt(secret, salt)
-            Decrypt a secret using AES256 encryption
-
-        encrypt(password)
-            Encrypt a password using AES256 encryption
-
-        _build_key(salt)
-            Build a key using the master password and a salt
+    Supports context manager usage with 'with' statement
     '''
 
     def __init__(
         self
     ) -> None:
         '''
-        Class constructor
         Gets the master password from an environment variable
         '''
 
@@ -65,7 +61,7 @@ class CryptoSecret:
     ) -> object:
         '''
         Context manager
-        Called when the 'with' statement is used
+            Called when the 'with' statement is used
 
         Returns:
             self
@@ -82,7 +78,7 @@ class CryptoSecret:
     ) -> None:
         '''
         Context manager
-        Called when the 'with' statement is finished
+            Called when the 'with' statement is finished
 
         Args:
             exc_type : Exception
@@ -102,14 +98,43 @@ class CryptoSecret:
                 print("Traceback:")
                 print(traceback.format_tb(exc_traceback))
 
+    def _build_key(
+        self,
+        salt: str,
+    ) -> Fernet:
+        '''
+        Builds a key using the master password and a salt
+
+        Args:
+            salt : str
+                The salt that was used to encrypt the password
+
+        Returns:
+            fernet : Fernet
+                The Fernet object used to encrypt/decrypt the password
+        '''
+
+        # generate a key using PBKDF2HMAC
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=salt,
+            iterations=100000
+        )
+        key = base64.urlsafe_b64encode(kdf.derive(self.master.encode()))
+
+        # create a Fernet object using the key
+        fernet = Fernet(key)
+
+        return fernet
+
     def decrypt(
         self,
         secret: str,
         salt: str,
     ) -> str | bool:
         '''
-        Uses a salt and the master password to decrypt the secret (password)
-        The master password is stored in an environment variable
+        Uses a salt and the master password to decrypt the string
 
         Args:
             secret : str
@@ -180,36 +205,6 @@ class CryptoSecret:
         encrypted_str = encrypted_message.decode('utf-8')
 
         return encrypted_str, salt_b64
-
-    def _build_key(
-        self,
-        salt: str,
-    ) -> Fernet:
-        '''
-        Builds a key using the master password and a salt
-
-        Parameters:
-            salt : str
-                The salt used to encrypt the password
-
-        Returns:
-            fernet : Fernet
-                The Fernet object used to encrypt/decrypt the password
-        '''
-
-        # generate a key using PBKDF2HMAC
-        kdf = PBKDF2HMAC(
-            algorithm=hashes.SHA256(),
-            length=32,
-            salt=salt,
-            iterations=100000
-        )
-        key = base64.urlsafe_b64encode(kdf.derive(self.master.encode()))
-
-        # create a Fernet object using the key
-        fernet = Fernet(key)
-
-        return fernet
 
 
 if __name__ == '__main__':

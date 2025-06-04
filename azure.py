@@ -1,19 +1,30 @@
 """
-Module to manage Azure AD.
-    - Handles user authentication via Azure AD.
+Module: azure.py
+
+Handles Azure AD authentication, token management, and Teams integration.
 
 Functions:
     - get_azure_config: Returns the Azure configuration from the global config.
     - get_auth_config: Returns the authentication configuration
         from the global config.
     - get_msal_app: Returns an MSAL app instance for authentication.
+
+Decorators:
     - login_required: Decorator to check if the user is logged in and
         has admin permissions.
 
-Routes:
+Blueprints:
+    - azure_auth: Flask blueprint for Azure AD authentication routes.
+
+Endpoints:
     - login: Route to handle user login, redirecting to Azure AD.
     - authorized: Callback route to handle Azure AD login response and
-        store user info.d
+        store user information.
+
+Dependencies:
+    - Flask: For web framework and session management.
+    - MSAL: For Microsoft Authentication Library to handle OAuth2 flows.
+    - TokenManager: Custom class for managing tokens.
 """
 
 
@@ -161,7 +172,7 @@ def graph_token_refresh() -> dict:
     }
 
 
-def login_required(f):
+def login_required(f) -> callable:
     """
     Decorator to check if the user is logged in and has admin permissions.
 
@@ -173,6 +184,12 @@ def login_required(f):
 
     Include 'prompt=login' parameter in the URL to force the user
         to log in, even if they are already logged in to Azure AD.
+
+    Args:
+        f (callable): The function to be decorated.
+
+    Returns:
+        callable: The decorated function that checks login and permissions.
     """
 
     @wraps(f)
@@ -289,7 +306,8 @@ def login():
 
 
 @azure_auth.route(
-    '/callback'
+    '/callback',
+    methods=['POST']
 )
 def authorized():
     '''
@@ -303,6 +321,9 @@ def authorized():
     3. Exchanges the code for an access token
     4. If successful, stores the user info in the session and TokenManager
     5. Redirects to the original URL or home page
+
+    Expects a JSON payload, containing:
+        "code": "authorization_code",
     '''
 
     # Check for errors in the request
@@ -381,3 +402,8 @@ def authorized():
     # If no code was provided, return an error
     logging.error("No code provided in the request")
     return "No code provided"
+
+
+if __name__ == '__main__':
+    print("This module is not designed to be run as a script")
+    print("Please import it into another module")

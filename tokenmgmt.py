@@ -1,6 +1,24 @@
 """
-Token management module.
-Contains classes and functions for managing tokens,
+Module: tokenmgmt.py
+
+Manages tokens used to access external services, such as APIs.
+
+When a user logs into the web UI, they are authenticated with Azure,
+    which returns a bearer token. This is managed by this module.
+The Teams service account also has a bearer token and a refresh token,
+    which are also managed by this module.
+
+Classes:
+    TokenManager
+        Manages external tokens, such as bearer tokens and refresh tokens.
+        Provides methods to add, retrieve, and delete tokens.
+        Uses an SQLite database to store tokens. When running as a container,
+            this lives for the lifetime of the container only.
+        Supports context management for automatic database connection handling.
+
+Dependencies:
+    sqlite3: Manage an SQLite database for token storage and retrieval.
+    systemlog: For logging system events and errors.
 """
 
 
@@ -13,33 +31,18 @@ from systemlog import system_log
 
 
 class TokenManager:
-    '''
-    TokenManager class.
-        This class is responsible for managing external tokens,
-        such as bearer tokens and refresh tokens for teams.
+    """
+    Manages external tokens such as bearer and refresh tokens for Teams
+        and other services.
 
-    Use the context manager when using this class to ensure
-        that the database connection is properly closed.
+    Tokens are stored in an SQLite database. Supports context management
+        for automatic database connection handling.
 
-    Tokens are stored in an SQLite database, which is created
-        at runtime, and destroyed at the end of the container's life.
-
-    Tokens can be added, retrieved, and deleted.
-        To update a token, it must be deleted and added again.
-
-    Methods:
-        - __init__: Initialize the TokenManager with a database path.
-        - __repr__: Unambiguous string representation of this instance.
-        - __str__: User-friendly representation of this instance.
-        - __iter__: Iterate over tokens stored in the database.
-        - __enter__: Open the database connection and return self.
-        - __exit__: Close the database connection, committing or rolling back
-        - _create_db: Create the SQLite database for token management.
-        - _clean_db: Check database for expired tokens, and remove them.
-        - add_token: Add a new token to the database.
-        - get_token: Get a token from the database.
-        - delete_token: Delete a token from the database based on user ID.
-    '''
+    Attributes:
+        db_path (str): Path to the SQLite database file.
+        conn (sqlite3.Connection): SQLite database connection.
+        c (sqlite3.Cursor): SQLite database cursor for executing queries.
+    """
 
     def __init__(
         self,
@@ -48,9 +51,8 @@ class TokenManager:
         """
         Initialize the TokenManager
 
-        Parameters:
+        Args:
             db_path (str): Path to the SQLite database file.
-                Defaults to "tokens.db".
         """
 
         # Setup database connection
@@ -115,9 +117,13 @@ class TokenManager:
         exc_tb
     ) -> None:
         """
-        Called when exiting the 'with' block.
         Closes the cursor and connection, optionally rolling back if there
             was an exception.
+
+        Args:
+            exc_type (Exception): The type of exception raised, if any.
+            exc_val (Exception): The value of the exception raised, if any.
+            exc_tb (traceback): The traceback of the exception raised, if any.
         """
 
         # commit only if there's no exception
@@ -194,10 +200,8 @@ class TokenManager:
     ) -> bool:
         """
         Add a new token to the database.
-            Requires a bearer token, and optionally a refresh token
-            An expiry time must be provided
 
-        Parameters:
+        Args:
             user_id (str, optional): The user ID associated with the token.
             bearer_token (str): The bearer token to be stored.
             refresh_token (str, optional): The refresh token to be stored.
@@ -205,6 +209,10 @@ class TokenManager:
 
         Returns:
             bool: True if the token was added successfully, False otherwise.
+
+        Raises:
+            ValueError: If any of the required parameters are missing
+                or invalid.
         """
 
         # Validate input parameters
@@ -252,7 +260,7 @@ class TokenManager:
         """
         Get a token from the database.
 
-        Parameters:
+        Args:
             user_id (str, optional): The user ID associated with the token.
                 If not provided, all tokens are returned.
 
@@ -317,7 +325,7 @@ class TokenManager:
         """
         Delete a token from the database, based on the user ID.
 
-        Parameters:
+        Args:
             user_id (str): The user ID associated with the token to be deleted.
 
         Returns:
@@ -354,3 +362,8 @@ class TokenManager:
                 secerity="error",
             )
             return False
+
+
+if __name__ == '__main__':
+    print("This module is not designed to be run as a script")
+    print("Please import it into another module")

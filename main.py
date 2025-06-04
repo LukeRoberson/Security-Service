@@ -1,12 +1,37 @@
 """
-The security service
+Module: main.py
 
-Used for:
-    - Authenticating users with an iDP
+The main entry point for the security service.
+This service handles security-related tasks such as:
+    - Authenticating web users with an IDP
+    - Teams token management
     - Encrypting and decrypting data
     - Validating signatures of messages
-    - Teams token management
+
+Module Tasks:
+    - Fetch global configuration from the web interface
+    - Set up logging based on the global configuration
+    - Create a Flask application
+    - Register blueprints for security API and authentication
+    - Provide the entry point for the Flask application
+
+Usage:
+    This is a Flask application that should run behind a WSGI server inside
+        a Docker container.
+    Build the Docker image and run it with the provided Dockerfile.
+
+Blueprints:
+    - security_api: Handles security-related API endpoints
+
+Dependencies:
+    - Flask: For creating the web application
+    - Flask-Session: For session management
+    - requests: For making API calls to other services
+    - logging: For logging messages to the terminal
+    - azure_auth: For Azure Active Directory authentication
+    - system_log: For sending logs to a logging service
 """
+
 
 from flask import Flask
 from flask_session import Session

@@ -1,10 +1,13 @@
 """
-API module.
-    Used for communication with other services.
+Module: api.py
+
+API endpoints for the security service. Other services can use these endpoints
+to authenticate users, generate tokens, and perform cryptographic operations.
 
 Functions:
-    - generate_auth_token:
-        Generate a secure token for a user.
+    - generate_auth_token: Generate a secure token for a user.
+        This is used to prove to the caller that the security service has
+        responded to the API request, not some attacker.
 
 Blueprint lists routes for the security API. This is registered in main.py
 
@@ -20,6 +23,35 @@ Routes:
     - /api/token:
         Return a bearer token for the Teams user.
         This can also be used to check if the user is authenticated.
+
+Blueprints:
+    security_api: Flask blueprint for the security API.
+
+Enfpoints:
+    - /api/health:
+        Health check endpoint to ensure the service is running.
+    - /auth:
+        Authenticate users and generate tokens.
+        Users are redirected here from other services.
+    - /api/hash:
+        Generate a hash for a given webhook, in order to verify its signature.
+    - /api/crypto:
+        Encrypt or decrypt a string using AES256 encryption.
+    - /api/token:
+        Return a bearer token for the Teams user to the caller.
+        Retrieves the token from the TokenManager.
+    - /api/refresh_token:
+        Refresh the Teams user token to ensure it is valid and up-to-date.
+        Stores the new token in the TokenManager.
+
+Dependencies:
+    - Flask: Web framework for building the API.
+    - hmac, hashlib: Libraries for generating secure hashes.
+    - itsdangerous: Library for generating secure tokens.
+    - CryptoSecret: Custom module for cryptographic operations.
+    - azure/login_required: Custom module to add security to the web interface.
+    - azure/graph_token_refresh: Custom module to refresh the Teams user token.
+    - TokenManager: Custom module for managing tokens.
 """
 
 
@@ -84,7 +116,11 @@ def health():
     Returns a JSON response indicating the service is running.
     """
 
-    return jsonify({'status': 'ok'})
+    return jsonify(
+        {
+            'status': 'ok'
+        }
+    )
 
 
 @security_api.route(
@@ -95,9 +131,15 @@ def health():
 def auth():
     '''
     Authentication endpoint.
+
     Users are redirected here from other services.
     The @login_required decorator checks if the user is logged in.
         If not, they are redirected to the login page.
+
+    Generates a token for the user and redirects them
+        to the original URL with the token as a query parameter.
+    The token is to confirm to the caller that the security service
+        has responded to the API request, not some attacker.
     '''
 
     # Get user details from the session and generate a token
@@ -161,7 +203,7 @@ def api_hash():
                 'result': 'error',
                 'error': 'Invalid signature'
             }
-        ), 403
+        ), 401
 
     return jsonify(
         {
@@ -361,3 +403,8 @@ def refresh_token():
                 'error': result.get('error', 'Unknown error occurred')
             }
         )
+
+
+if __name__ == '__main__':
+    print("This module is not designed to be run as a script")
+    print("Please import it into another module")

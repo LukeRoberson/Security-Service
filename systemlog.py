@@ -1,10 +1,16 @@
 """
-Classes to manage system logs.
-This sends logs to the logging service to manage.
+Module: systemlog.py
+
+Manage system logs. This is for sending logs to a logging service in a
+    structured format.
 
 Classes:
-    SystemLog: Class to manage system logs.
-        It can send logs to the logging service with default values.
+    SystemLog
+        Manage system logs for this service. These are sent to the
+        logging service through an API.
+
+Dependencies:
+    requests: For making HTTP requests to the logging service
 """
 
 import logging
@@ -13,14 +19,18 @@ from datetime import datetime
 
 
 class SystemLog:
-    '''
-    Class to manage system logs.
-    Gets logs, and sends them to the logging service.
+    """
+    Manages sending logs to the logging service.
 
-    Methods:
-        __init__: Initialise the SystemLog class with default values.
-        log: Send a log message to the logging service.
-    '''
+    Attributes:
+        url (str): The URL of the logging service API.
+        source (str): The source of the log message.
+        destination (list): The destinations for the log message.
+        group (str): The group to which the log message belongs.
+        category (str): The category of the log message.
+        alert (str): The alert type for the log message.
+        severity (str): The severity level of the log message.
+    """
 
     def __init__(
         self,
@@ -152,3 +162,8 @@ system_log = SystemLog(
     alert="system",
     severity="info"
 )
+
+
+if __name__ == '__main__':
+    print("This module is not designed to be run as a script")
+    print("Please import it into another module")
