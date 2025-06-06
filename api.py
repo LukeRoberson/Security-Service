@@ -27,7 +27,7 @@ Routes:
 Blueprints:
     security_api: Flask blueprint for the security API.
 
-Enfpoints:
+Endpoints:
     - /api/health:
         Health check endpoint to ensure the service is running.
     - /auth:

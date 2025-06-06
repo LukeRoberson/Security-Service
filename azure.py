@@ -259,6 +259,10 @@ def login():
 
     Include the 'prompt=login' parameter in the URL to force
         the user to log in, even if they are already logged in to Azure AD.
+
+    NOTE: When logging on as a service account, the user will be prompted
+        to decide if they want to stay signed in. Unfortunately, there is
+        no way to suppress this prompt.
     '''
 
     msal_app = get_msal_app()
@@ -387,7 +391,7 @@ def authorized():
             if next_url:
                 logging.info("Redirecting to original URL: %s", next_url)
                 return redirect(next_url)
-            return redirect('/')
+            return redirect('/close')
 
         # If the token was not retrieved, return an error
         logging.error(
