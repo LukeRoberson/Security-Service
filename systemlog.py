@@ -18,6 +18,9 @@ import requests
 from datetime import datetime
 
 
+LOG_URL = "http://logging:5100/api/log"
+
+
 class SystemLog:
     """
     Manages sending logs to the logging service.
@@ -154,7 +157,7 @@ class SystemLog:
 
 # Initialize the SystemLog with default values
 system_log = SystemLog(
-    logging_url="http://logging:5100/api/log",
+    logging_url=LOG_URL,
     source="security",
     destination=["web"],
     group="service",
