@@ -56,12 +56,14 @@ Dependencies:
 
 
 from flask import (
-    Blueprint,
     request,
-    jsonify,
     session,
     current_app,
+    Blueprint,
+    Response,
     redirect,
+    jsonify,
+    make_response
 )
 
 import logging
@@ -69,6 +71,7 @@ import hmac
 import hashlib
 from itsdangerous import URLSafeTimedSerializer
 from time import time
+from typing import Any, cast
 
 from crypto import CryptoSecret
 from azure import login_required, graph_token_refresh
@@ -144,6 +147,10 @@ def auth():
 
     # Get user details from the session and generate a token
     user = session.get('user')
+    if not user:
+        logging.error("User not found in session. Redirecting to login.")
+        return redirect('/login')
+
     secret_key = current_app.config['SECRET_KEY']
     token = generate_auth_token(user, secret_key)
 
@@ -216,7 +223,7 @@ def api_hash():
     '/api/crypto',
     methods=['POST']
 )
-def api_crypto():
+def api_crypto() -> Response:
     """
     Endpoint to encrypt or decrypt data.
 
@@ -242,36 +249,45 @@ def api_crypto():
     crypto_type = data.get('type')
     if crypto_type not in ['encrypt', 'decrypt']:
         logging.error("Invalid crypto type: %s", crypto_type)
-        return jsonify(
-            {
-                'result': 'error',
-                'error': 'Invalid crypto type'
-            }
-        ), 400
+        return make_response(
+            jsonify(
+                {
+                    "result": "error",
+                    "error": "Invalid crypto type"
+                }
+            ),
+            400
+        )
 
     if crypto_type == 'encrypt':
         # Get the string to encrypt
         plain_text = data.get('plain-text')
         if not plain_text:
             logging.error("Missing 'plain-text' in the request.")
-            return jsonify(
-                {
-                    'result': 'error',
-                    'error': "Missing 'plain-text' in the request"
-                }
-            ), 400
+            return make_response(
+                jsonify(
+                    {
+                        "result": "error",
+                        "error": "Missing 'plain-text' in the request"
+                    }
+                ),
+                400
+            )
 
         # Encrypt the string using the Crypto class
         with CryptoSecret() as crypto:
             encrypted, salt = crypto.encrypt(plain_text)
 
         # Return the encrypted string and salt
-        return jsonify(
-            {
-                'result': 'success',
-                'encrypted': str(encrypted),
-                'salt': str(salt)
-            }
+        return make_response(
+            jsonify(
+                {
+                    "result": "success",
+                    "encrypted": str(encrypted),
+                    "salt": str(salt)
+                }
+            ),
+            200
         )
 
     elif crypto_type == 'decrypt':
@@ -280,12 +296,15 @@ def api_crypto():
         salt = data.get('salt')
         if not encrypted or not salt:
             logging.error("Missing 'encrypted' or 'salt' in the request.")
-            return jsonify(
-                {
-                    'result': 'error',
-                    'error': "Missing 'encrypted' or 'salt' in the request"
-                }
-            ), 400
+            return make_response(
+                jsonify(
+                    {
+                        "result": "error",
+                        "error": "Missing 'encrypted' or 'salt' in the request"
+                    }
+                ),
+                400
+            )
 
         # Decrypt the string using the Crypto class
         with CryptoSecret() as crypto:
@@ -293,20 +312,36 @@ def api_crypto():
 
         if not decrypted:
             logging.error("Decryption failed.")
-            return jsonify(
-                {
-                    'result': 'error',
-                    'error': 'Decryption failed'
-                }
-            ), 500
+            return make_response(
+                jsonify(
+                    {
+                        "result": "error",
+                        "error": "Decryption failed"
+                    }
+                ),
+                500
+            )
 
         # Return the decrypted string
-        return jsonify(
-            {
-                'result': 'success',
-                'decrypted': decrypted
-            }
+        return make_response(
+            jsonify(
+                {
+                    "result": "success",
+                    "decrypted": decrypted
+                }
+            ),
+            200
         )
+
+    return make_response(
+        jsonify(
+            {
+                "result": "error",
+                "error": "Invalid crypto type"
+            }
+        ),
+        400
+    )
 
 
 @security_api.route(
@@ -334,6 +369,7 @@ def bearer_token():
         # Check if the token is available
         service_account = current_app.config['GLOBAL_CONFIG']['teams']['user']
         token = token_manager.get_token(user_id=service_account)
+        token = cast(dict[str, Any], token)
 
     # Token found
     if token:
@@ -342,14 +378,17 @@ def bearer_token():
             service_account
         )
 
-        return jsonify(
-            {
-                'result': 'success',
-                'user': token['user_id'],
-                'token': token['bearer'],
-                'validity': int(time()) + 60
-            }
-        ), 200
+        return make_response(
+            jsonify(
+                {
+                    "result": "success",
+                    "user": token['user_id'],
+                    "token": token['bearer'],
+                    "validity": int(time()) + 60
+                }
+            ),
+            200
+        )
 
     # Token not found
     else:

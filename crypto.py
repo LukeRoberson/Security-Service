@@ -33,6 +33,7 @@ import logging
 
 import traceback
 from typing import Tuple
+import types
 
 
 class CryptoSecret:
@@ -58,7 +59,7 @@ class CryptoSecret:
 
     def __enter__(
         self
-    ) -> object:
+    ) -> 'CryptoSecret':
         '''
         Context manager
             Called when the 'with' statement is used
@@ -74,7 +75,7 @@ class CryptoSecret:
         self,
         exc_type: Exception,
         exc_value: Exception,
-        exc_traceback: traceback,
+        exc_traceback: types.TracebackType,
     ) -> None:
         '''
         Context manager
@@ -92,7 +93,7 @@ class CryptoSecret:
         # handle errors that were raised
         if exc_type:
             logging.error(
-                f"Exception of type {exc_type.__name__} occurred: {exc_value}"
+                f"Exception of type {exc_type} occurred: {exc_value}"
             )
             if exc_traceback:
                 print("Traceback:")
@@ -100,8 +101,8 @@ class CryptoSecret:
 
     def _build_key(
         self,
-        salt: str,
-    ) -> Fernet:
+        salt: bytes,
+    ) -> Fernet | None:
         '''
         Builds a key using the master password and a salt
 
@@ -112,6 +113,7 @@ class CryptoSecret:
         Returns:
             fernet : Fernet
                 The Fernet object used to encrypt/decrypt the password
+            None : If there was a problem creating the key
         '''
 
         # generate a key using PBKDF2HMAC
@@ -121,7 +123,15 @@ class CryptoSecret:
             salt=salt,
             iterations=100000
         )
-        key = base64.urlsafe_b64encode(kdf.derive(self.master.encode()))
+        if self.master is None:
+            logging.error("Master password is not set, cannot create key")
+            return None
+
+        key = base64.urlsafe_b64encode(
+            kdf.derive(
+                self.master.encode()
+            )
+        )
 
         # create a Fernet object using the key
         fernet = Fernet(key)
@@ -155,6 +165,9 @@ class CryptoSecret:
 
         # decrypt the encrypted message using the same key
         try:
+            if fernet is None:
+                logging.error("Failed to create Fernet object, cannot decrypt")
+                return False
             password = fernet.decrypt(
                 secret.encode()
             ).decode('utf-8')
@@ -198,6 +211,9 @@ class CryptoSecret:
         fernet = self._build_key(salt)
 
         # encrypt the plaintext using AES256 encryption
+        if fernet is None:
+            logging.error("Failed to create Fernet object, cannot encrypt")
+            return "", ""
         encrypted_message = fernet.encrypt(password.encode())
 
         # Encode salt as base64 string for safe transport

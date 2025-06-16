@@ -23,7 +23,7 @@ Dependencies:
 
 
 import sqlite3
-from typing import Optional
+from typing import Optional, Any
 import logging
 import time
 
@@ -81,17 +81,6 @@ class TokenManager:
 
         return f"TokenManager for DB at {self.db_path}"
 
-    def __iter__(
-        self
-    ) -> iter:
-        """
-        Make this class iterable over tokens stored in the database.
-        """
-
-        tokens = self.get_token()
-        for token in tokens:
-            yield token
-
     def __enter__(
         self
     ) -> "TokenManager":
@@ -128,11 +117,13 @@ class TokenManager:
 
         # commit only if there's no exception
         if exc_type is None:
-            self.conn.commit()
+            if self.conn is not None:
+                self.conn.commit()
 
         # rollback if an error occurred
         else:
-            self.conn.rollback()
+            if self.conn is not None:
+                self.conn.rollback()
 
         # Close the cursor and connection
         if self.c:
@@ -156,6 +147,8 @@ class TokenManager:
             - refresh: The refresh token to be stored.
         """
 
+        if self.c is None:
+            raise RuntimeError("Database cursor is not initialized")
         self.c.execute("""
             CREATE TABLE IF NOT EXISTS tokenmgmt (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -166,6 +159,8 @@ class TokenManager:
                 expiry INTEGER NOT NULL
             )
         """)
+        if self.conn is None:
+            raise RuntimeError("Database connection is not initialized")
         self.conn.commit()
 
         logging.info("Database initialized at %s", self.db_path)
@@ -179,6 +174,8 @@ class TokenManager:
         """
 
         current_time = int(time.time())
+        if self.c is None:
+            raise RuntimeError("Database cursor is not initialized")
         self.c.execute(
             """
             DELETE FROM tokenmgmt
@@ -186,16 +183,18 @@ class TokenManager:
             """,
             (current_time,)
         )
+        if self.conn is None:
+            raise RuntimeError("Database connection is not initialized")
         self.conn.commit()
 
         logging.info("Cleaned up expired tokens from the database")
 
     def add_token(
         self,
-        user_id: str = None,
-        bearer_token: str = None,
-        refresh_token: str = None,
-        expiration: int = None,
+        user_id: Optional[str] = None,
+        bearer_token: Optional[str] = None,
+        refresh_token: Optional[str] = None,
+        expiration: Optional[int] = None,
     ) -> bool:
         """
         Add a new token to the database.
@@ -231,6 +230,8 @@ class TokenManager:
         self._clean_db()
 
         try:
+            if self.c is None:
+                raise RuntimeError("Database cursor is not initialized")
             self.c.execute(
                 """
                 INSERT INTO tokenmgmt (user_id, bearer, refresh, expiry)
@@ -245,7 +246,7 @@ class TokenManager:
             logging.error("Failed to add token: %s", e)
             system_log.log(
                 f"Failed to add token: {e}",
-                secerity="error",
+                severity="error",
             )
             return False
 
@@ -255,7 +256,7 @@ class TokenManager:
     def get_token(
         self,
         user_id: Optional[str] = None,
-    ) -> dict | None:
+    ) -> list[dict[str, Any]] | dict | None:
         """
         Get a token from the database.
 
@@ -278,6 +279,8 @@ class TokenManager:
 
         # if there is no user_id provided, return all tokens
         if not user_id:
+            if self.c is None:
+                raise RuntimeError("Database cursor is not initialized")
             self.c.execute(
                 """
                 SELECT user_id, bearer, refresh, expiry
@@ -298,6 +301,8 @@ class TokenManager:
 
         # if a user_id is provided, return the token for that user_id
         else:
+            if self.c is None:
+                raise RuntimeError("Database cursor is not initialized")
             self.c.execute(
                 """
                 SELECT user_id, bearer, refresh, expiry
@@ -338,6 +343,8 @@ class TokenManager:
 
         # Delete the token for the given user_id
         try:
+            if self.c is None:
+                raise RuntimeError("Database cursor is not initialized")
             self.c.execute(
                 """
                 DELETE FROM tokenmgmt
@@ -358,7 +365,7 @@ class TokenManager:
             logging.error("Failed to delete token: %s", e)
             system_log.log(
                 f"Failed to delete token: {e}",
-                secerity="error",
+                severity="error",
             )
             return False
 

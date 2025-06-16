@@ -42,6 +42,7 @@ from functools import wraps
 import msal
 import uuid
 import logging
+from typing import cast, Any, Callable
 
 from tokenmgmt import TokenManager
 
@@ -114,6 +115,7 @@ def graph_token_refresh() -> dict:
     with TokenManager() as token_manager:
         # Retrieve the refresh token for the service account
         token = token_manager.get_token(user_id=service_account)
+        token = cast(dict[str, Any], token)
 
     if not token or 'refresh' not in token:
         logging.error(
@@ -172,7 +174,7 @@ def graph_token_refresh() -> dict:
     }
 
 
-def login_required(f) -> callable:
+def login_required(f) -> Callable:
     """
     Decorator to check if the user is logged in and has admin permissions.
 
@@ -380,7 +382,8 @@ def authorized():
             logging.debug("User info stored in session: %s", session['user'])
 
             # Store the groups in the session
-            session['groups'] = result.get('id_token_claims').get('groups', [])
+            token_claims = result.get('id_token_claims', {})
+            session['groups'] = token_claims.get('groups', [])
             logging.debug(
                 "User groups stored in session: %s",
                 session['groups']
