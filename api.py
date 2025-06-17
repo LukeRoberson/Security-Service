@@ -9,6 +9,9 @@ Functions:
         This is used to prove to the caller that the security service has
         responded to the API request, not some attacker.
 
+Classes:
+    - PluginAPI: Manage plugins through the Core API.
+
 Blueprint lists routes for the security API. This is registered in main.py
 
 Routes:
@@ -35,6 +38,8 @@ Endpoints:
         Users are redirected here from other services.
     - /api/hash:
         Generate a hash for a given webhook, in order to verify its signature.
+    - /api/basic:
+        Handle basic authentication for plugins.
     - /api/crypto:
         Encrypt or decrypt a string using AES256 encryption.
     - /api/token:
@@ -48,13 +53,17 @@ Dependencies:
     - Flask: Web framework for building the API.
     - hmac, hashlib: Libraries for generating secure hashes.
     - itsdangerous: Library for generating secure tokens.
+    - requests: Library for making HTTP requests to the Core API.
+    - base64: Library for encoding and decoding base64 strings.
+
+Custom Dependencies:
     - CryptoSecret: Custom module for cryptographic operations.
     - azure/login_required: Custom module to add security to the web interface.
     - azure/graph_token_refresh: Custom module to refresh the Teams user token.
     - TokenManager: Custom module for managing tokens.
 """
 
-
+# Standard library imports
 from flask import (
     request,
     session,
@@ -65,17 +74,125 @@ from flask import (
     jsonify,
     make_response
 )
-
 import logging
 import hmac
 import hashlib
 from itsdangerous import URLSafeTimedSerializer
 from time import time
-from typing import Any, cast
+from typing import Any, cast, Optional
+import requests
 
+# Custom module imports
 from crypto import CryptoSecret
 from azure import login_required, graph_token_refresh
 from tokenmgmt import TokenManager
+import base64
+
+
+PLUGINS_URL = "http://core:5100/api/plugins"
+
+
+class PluginAPI:
+    """
+    Manage plugins through the Core API.
+
+    Args:
+        plugins_url (str): The URL to the plugins API.
+    """
+
+    def __init__(
+        self,
+        plugins_url: str = PLUGINS_URL
+    ):
+        """
+        Initialize the PluginAPI with the URL to the plugins API.
+        """
+        self.url = plugins_url
+
+    def __enter__(
+        self
+    ) -> 'PluginAPI':
+        """
+        Enter the runtime context related to this object.
+
+        Returns:
+            PluginAPI: The instance of the PluginAPI.
+        """
+
+        return self
+
+    def __exit__(
+        self,
+        exc_type: Optional[type],
+        exc_value: Optional[Exception],
+        traceback: Optional[object]
+    ) -> None:
+        """
+        Exit the runtime context related to this object.
+
+        Args:
+            exc_type (Optional[type]): The exception type.
+            exc_value (Optional[Exception]): The exception value.
+            traceback (Optional[object]): The traceback object.
+        """
+
+        # No cleanup needed for this context manager
+        pass
+
+    def get_plugins(
+        self,
+    ) -> list[dict]:
+        """
+        Fetch the list of plugins from the core API.
+
+        Args:
+            plugins_url (str): The URL to fetch the plugins from.
+
+        Returns:
+            dict: A dictionary containing the list of plugins.
+        """
+
+        # API call
+        try:
+            response = requests.get(
+                self.url,
+                headers={"X-Plugin-Name": "all"},
+                timeout=3
+            )
+            if response.status_code == 200:
+                plugin_list = response.json()['plugins']
+                logging.debug("Fetched plugins from API: %s", plugin_list)
+
+            else:
+                plugin_list = []
+                logging.warning(
+                    "Failed to fetch plugins from API:\n %s",
+                    response.text
+                )
+
+        except Exception as e:
+            plugin_list = []
+            logging.error("Error accessing the plugins API: %s", e)
+
+        return plugin_list
+
+    def get_plugin_by_name(
+        self,
+        plugin_name: str
+    ) -> Optional[dict]:
+        """
+        Find a plugin's configuration by its name.
+
+        Args:
+            plugin_name (str): The name of the plugin to find.
+        """
+
+        plugin_list = self.get_plugins()
+        for plugin in plugin_list:
+            if plugin['name'] == plugin_name:
+                return plugin
+
+        return None
 
 
 def generate_auth_token(
@@ -176,6 +293,7 @@ def auth():
 def api_hash():
     """
     Endpoint to generate a hash for a given message.
+        Used to verify signatures using HMAC with SHA-256.
 
     Expects a JSON payload with:
         'message' - The message to hash.
@@ -217,6 +335,112 @@ def api_hash():
             'result': 'success'
         }
     )
+
+
+@security_api.route(
+    '/api/basic',
+    methods=['POST']
+)
+def api_basic() -> Response:
+    """
+    Endpoint to handle basic authentication.
+
+    Expects a JSON payload with:
+        'plugin' - The name of the plugin making the request.
+        'auth' - The auth string
+    """
+
+    data = request.get_json()
+
+    if not data:
+        logging.error("No data provided in the request.")
+        return make_response(
+            jsonify(
+                {
+                    "result": "error",
+                    "error": "No data provided in the request"
+                }
+            ),
+            400
+        )
+
+    # Check if the required fields are present
+    plugin = data.get('plugin')
+    auth = data.get('auth')
+
+    if not plugin or not auth:
+        logging.error("Missing 'plugin' or 'auth' in the request.")
+        return make_response(
+            jsonify(
+                {
+                    "result": "error",
+                    "error": "Missing 'plugin' or 'auth' in the request"
+                }
+            ),
+            400
+        )
+
+    # Get the secret for the plugin from the Core API
+    with PluginAPI() as plugin_api:
+        # Get the plugin configuration from the Core API
+        plugin_config = plugin_api.get_plugin_by_name(plugin)
+        if not plugin_config:
+            logging.error(f"Plugin '{plugin}' not found in the Core API.")
+            return make_response(
+                jsonify(
+                    {
+                        "result": "error",
+                        "error": f"Plugin '{plugin}' not found"
+                    }
+                ),
+                404
+            )
+
+        secret = plugin_config['webhook']['secret']
+
+    # Convert the auth string to username and password
+    auth = auth.replace('Basic ', '', 1).strip()
+    try:
+        decoded_auth = base64.b64decode(auth).decode('utf-8')
+
+    except Exception as e:
+        logging.error(f"Failed to decode base64 auth string: {e}")
+        return make_response(
+            jsonify(
+                {
+                    "result": "error",
+                    "error": "Invalid base64 encoding in 'auth'"
+                }
+            ),
+            400
+        )
+
+    # Return a success response
+    if decoded_auth == secret:
+        return make_response(
+            jsonify(
+                {
+                    "result": "success",
+                    "message": f"Authenticated {plugin} successfully"
+                }
+            ),
+            200
+        )
+
+    else:
+        logging.error(
+            f"Authentication failed for plugin '{plugin}'. "
+            f"Provided auth: {decoded_auth}, expected: {secret}"
+        )
+        return make_response(
+            jsonify(
+                {
+                    "result": "error",
+                    "error": "Authentication failed"
+                }
+            ),
+            401
+        )
 
 
 @security_api.route(

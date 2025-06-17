@@ -27,12 +27,7 @@ The security service manages anything related to security for the application as
 
 ## Other Files
 
-| File             | Description                                         |
-| ---------------- | --------------------------------------------------- |
-| .dockerignore    | Files that are excluded from the container image    |
-| .gitignore       | Files that are excluded from git                    |
-| Dockerfile       | For building the image                              |
-| requirements.txt | Python modules and versions to install in the image |
+None
 
 
 
@@ -141,10 +136,45 @@ A webhook is often sent with a signature (although this depends on the sender) t
 
 We can use this to validate that this webhook was sent from a valid source. This relies on the sender being configured to use a **secret**.
 
+Two types of signature validation are supported:
+* Basic Auth
+* HMAC with SHA256
+</br></br>
+
+
+## Basic Auth
+
+Basic authentication uses a combination of username and password. These are concatenated togther like this:
+
+```
+username:password
+```
+
+They are then encoded using Base-64. No encryption is applied at all.
+
+
+> [!CAUTION]
+> Basic Auth is not very secure, and it is easy to decrypt a username/password from the header.
+</br></br>
+
+The encoded string is passed in the **Authorization** header of the webhook, in this format:
+
+```
+"Authorization": "Basic <encoded-string>"
+```
+</br></br>
+
+To validate based on this header:
+1. Get the Base64 string from the **Authorization** header
+2. Decode to a plain-text string
+3. Get the username and password (delimited by a _colon_)
+4. Compare them to the recorded results
+
+
 
 ## HMAC_SHA256
 
-One common way is for the sender to generate the signature and attach it as a header.
+One common way is for the sender to generate the signature and attach it as a header. This is implemented directly in the API endpoint (/api/hash).
 
 The sender will:
 1. Concatenate the secret with the message body (in that order) to create a string

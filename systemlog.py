@@ -16,6 +16,7 @@ Dependencies:
 import logging
 import requests
 from datetime import datetime
+from typing import Optional
 
 
 LOG_URL = "http://logging:5100/api/log"
@@ -75,12 +76,12 @@ class SystemLog:
     def log(
         self,
         message: str,
-        source: str = None,
-        destination: list = None,
-        group: str = None,
-        category: str = None,
-        alert: str = None,
-        severity: str = None,
+        source: Optional[str] = None,
+        destination: Optional[list] = None,
+        group: Optional[str] = None,
+        category: Optional[str] = None,
+        alert: Optional[str] = None,
+        severity: Optional[str] = None,
     ) -> bool:
         """
         Send a log message to the logging service.
