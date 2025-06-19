@@ -81,15 +81,17 @@ from itsdangerous import URLSafeTimedSerializer
 from time import time
 from typing import Any, cast, Optional
 import requests
+import base64
 
 # Custom module imports
 from crypto import CryptoSecret
 from azure import login_required, graph_token_refresh
 from tokenmgmt import TokenManager
-import base64
+from sdk import Config
 
 
 PLUGINS_URL = "http://core:5100/api/plugins"
+CONFIG_URL = "http://core:5100/api/config"
 
 
 class PluginAPI:
@@ -589,9 +591,14 @@ def bearer_token():
         404 - Token not found
     """
 
+    # Get global config
+    config_data = {}
+    with Config(CONFIG_URL) as config:
+        config_data = config.read()
+
     with TokenManager() as token_manager:
         # Check if the token is available
-        service_account = current_app.config['GLOBAL_CONFIG']['teams']['user']
+        service_account = config_data['teams']['user']
         token = token_manager.get_token(user_id=service_account)
         token = cast(dict[str, Any], token)
 

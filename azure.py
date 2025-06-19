@@ -27,7 +27,7 @@ Dependencies:
     - TokenManager: Custom class for managing tokens.
 """
 
-
+# Standard library imports
 from flask import (
     Blueprint,
     session,
@@ -35,16 +35,19 @@ from flask import (
     url_for,
     request,
     jsonify,
-    current_app
 )
-
 from functools import wraps
 import msal
 import uuid
 import logging
 from typing import cast, Any, Callable
 
+# Custom imports
 from tokenmgmt import TokenManager
+from sdk import Config
+
+
+CONFIG_URL = "http://core:5100/api/config"
 
 
 # Azure scope: Permissions to access the web interface
@@ -65,7 +68,11 @@ def get_azure_config() -> dict:
     Returns the Azure configuration from the global config.
     '''
 
-    return current_app.config['GLOBAL_CONFIG']['azure']
+    config = {}
+    with Config(CONFIG_URL) as config_manager:
+        config = config_manager.read()
+
+    return config['azure']
 
 
 def get_auth_config() -> dict:
@@ -73,9 +80,11 @@ def get_auth_config() -> dict:
     Returns the authentication configuration from the global config.
     '''
 
-    logging.debug("Getting auth config")
-    logging.debug("GLOBAL_CONFIG: %s", current_app.config['GLOBAL_CONFIG'])
-    return current_app.config['GLOBAL_CONFIG']['authentication']
+    config = {}
+    with Config(CONFIG_URL) as config_manager:
+        config = config_manager.read()
+
+    return config['authentication']
 
 
 def get_msal_app() -> msal.ConfidentialClientApplication:
@@ -109,7 +118,11 @@ def graph_token_refresh() -> dict:
     '''
 
     # Get the service account user from the config
-    service_account = current_app.config["GLOBAL_CONFIG"]['teams']['user']
+    config = {}
+    with Config(CONFIG_URL) as config_manager:
+        config = config_manager.read()
+
+    service_account = config['teams']['user']
 
     # Get the current refresh token
     with TokenManager() as token_manager:
@@ -286,7 +299,12 @@ def login():
     if prompt_mode:
         # Enables the 'prompt' parameter in the authorization request
         prompt_value = prompt_mode
-        login_hint = current_app.config['GLOBAL_CONFIG']['teams']['user']
+
+        config = {}
+        with Config(CONFIG_URL) as config_manager:
+            config = config_manager.read()
+
+        login_hint = config['teams']['user']
 
         # Update the scope to the teams scope
         #   If the prompt is 'login', we assume the user is the service account

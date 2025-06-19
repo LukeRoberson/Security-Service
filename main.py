@@ -21,8 +21,6 @@ Usage:
     Build the Docker image and run it with the provided Dockerfile.
 
 Functions:
-    - fetch_global_config:
-        Fetches the global configuration from the web interface.
     - logging_setup:
         Sets up the root logger for the web service.
     - create_app:
@@ -40,52 +38,19 @@ Dependencies:
     - system_log: For sending logs to a logging service
 """
 
-
+# Standard library imports
 from flask import Flask
 from flask_session import Session
 import os
-import requests
 import logging
 
+# Custom imports
 from azure import azure_auth
 from api import security_api
+from sdk import Config
 
 
 CONFIG_URL = "http://core:5100/api/config"
-
-
-def fetch_global_config(
-    url: str = CONFIG_URL,
-) -> dict:
-    """
-    Fetch the global configuration from the core service.
-
-    Args:
-        None
-
-    Returns:
-        dict: The global configuration loaded from the core service.
-
-    Raises:
-        RuntimeError: If the global configuration cannot be loaded.
-    """
-
-    global_config = None
-    try:
-        response = requests.get(url, timeout=3)
-        response.raise_for_status()
-        global_config = response.json()
-
-    except Exception as e:
-        logging.critical(
-            "Failed to fetch global config from core service."
-            f" Error: {e}"
-        )
-
-    if global_config is None:
-        raise RuntimeError("Could not load global config from core service")
-
-    return global_config['config']
 
 
 def logging_setup(
@@ -114,14 +79,13 @@ def logging_setup(
 
 
 def create_app(
-    config: dict,
 ) -> Flask:
     """
     Create the Flask application instance and set up the configuration.
     Registers the necessary blueprints for the web service.
 
     Args:
-        config (dict): The global configuration dictionary
+        None
 
     Returns:
         Flask: The Flask application instance.
@@ -132,7 +96,6 @@ def create_app(
     app.config['SECRET_KEY'] = os.getenv('api_master_pw')
     app.config['SESSION_TYPE'] = 'filesystem'
     app.config['SESSION_FILE_DIR'] = '/app/flask_session'
-    app.config['GLOBAL_CONFIG'] = config
     Session(app)
 
     # Register blueprints
@@ -143,6 +106,8 @@ def create_app(
 
 
 # Setup the security service
-global_config = fetch_global_config(CONFIG_URL)
+global_config = {}
+with Config(CONFIG_URL) as config:
+    global_config = config.read()
 logging_setup(global_config)
-app = create_app(global_config)
+app = create_app()
