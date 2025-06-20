@@ -18,16 +18,34 @@ Classes:
 
 Dependencies:
     sqlite3: Manage an SQLite database for token storage and retrieval.
-    systemlog: For logging system events and errors.
+
+Custom Dependencies:
+    sdk: SystemLog for logging system events.
 """
 
-
+# Standard library imports
 import sqlite3
 from typing import Optional, Any
 import logging
 import time
 
-from systemlog import system_log
+# Custom imports
+from sdk import SystemLog
+
+
+LOG_URL = "http://logging:5100/api/log"
+
+
+# Initialize the SystemLog with default values
+system_log = SystemLog(
+    logging_url=LOG_URL,
+    source="security",
+    destination=["web"],
+    group="service",
+    category="security",
+    alert="system",
+    severity="info"
+)
 
 
 class TokenManager:
