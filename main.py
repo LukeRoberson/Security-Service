@@ -47,28 +47,26 @@ import logging
 # Custom imports
 from azure import azure_auth
 from api import security_api
-from sdk import Config
 
 
 CONFIG_URL = "http://core:5100/api/config"
 
 
 def logging_setup(
-    config: dict,
+    log_level: str = "INFO",
 ) -> None:
     """
     Set up the root logger for the web service.
+    Unlike other services, the logging level can't be retrieved from the
+        global configuration. This is because the core service relies on the
+        security service to decrypt secrets in the configuration.
 
     Args:
-        config (dict): The global configuration dictionary
+        logging (str): The logging level to set for the root logger.
 
     Returns:
         None
     """
-
-    # Get the logging level from the configuration (eg, "INFO")
-    log_level_str = config['web']['logging-level'].upper()
-    log_level = getattr(logging, log_level_str, logging.INFO)
 
     # Set up the logging configuration
     logging.basicConfig(
@@ -106,8 +104,5 @@ def create_app(
 
 
 # Setup the security service
-global_config = {}
-with Config(CONFIG_URL) as config:
-    global_config = config.read()
-logging_setup(global_config)
+logging_setup(log_level="INFO")
 app = create_app()
