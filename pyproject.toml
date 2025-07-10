@@ -1,0 +1,9 @@
+[tool.project-metadata]
+name = "Security Service"
+description = "The security service for the AI assistant app"
+version = "1.0.1"
+
+[tool.versioning]
+major = 1
+minor = 0
+patch = 1

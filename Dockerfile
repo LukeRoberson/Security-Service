@@ -23,3 +23,7 @@ COPY . .
 
 # Start the application using uWSGI
 CMD ["uwsgi", "--ini", "uwsgi.ini"]
+
+# Set the version of the image in metadata
+ARG VERSION
+LABEL org.opencontainers.image.version="${VERSION}"
