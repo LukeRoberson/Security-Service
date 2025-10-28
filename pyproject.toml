@@ -1,7 +1,7 @@
 [project]
 name = "Security"
 description = "The security service for the AI assistant app"
-version = "1.0.2"
+version = "1.0.3"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -35,7 +35,7 @@ exclude = [
 [tool.versioning]
 major = 1
 minor = 0
-patch = 2
+patch = 3
 
 [tool.flake8]
 max-line-length = 88
